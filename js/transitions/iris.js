@@ -2,9 +2,9 @@
  * Pixelated Iris — transition
  * Library: GSAP + Canvas API
  *
- * Mosaic pixels expand from center outward, covering the screen.
- * Mode snaps underneath at full coverage, then pixels retract to center.
- * Overlay is position:fixed — canvas fills the full viewport.
+ * Mosaic pixels expand from center outward covering the screen,
+ * mode snaps underneath, then pixels retract back to center.
+ * Tune PIXEL_SIZE and COVER_COLOR below.
  */
 
 const PIXEL_SIZE  = 20;
@@ -18,25 +18,24 @@ export default {
   description: 'Mosaic pixels expand from center outward. Mode snaps underneath, then pixels retract.',
 
   play(els, from, to, done) {
-    const { overlay, sidebar, content, brand, avatar, toggle, dot, modes } = els;
-    const toMode  = modes[to];
+    const { overlay, msgBox, msgPrim, msgSec, modes } = els;
     const fromMsg = modes[from].leaving;
 
-    const W = window.innerWidth;
-    const H = window.innerHeight;
-
+    const W    = window.innerWidth;
+    const H    = window.innerHeight;
     const cols = Math.ceil(W / PIXEL_SIZE) + 1;
     const rows = Math.ceil(H / PIXEL_SIZE) + 1;
 
     const canvas = document.createElement('canvas');
     canvas.width  = cols * PIXEL_SIZE;
     canvas.height = rows * PIXEL_SIZE;
-    canvas.style.cssText = 'position:absolute;top:0;left:0;display:block;';
+    // position:fixed so it aligns with the viewport-relative overlay
+    canvas.style.cssText = 'position:fixed;top:0;left:0;display:block;pointer-events:none;';
     const ctx = canvas.getContext('2d');
 
     const msgEl = document.createElement('div');
     msgEl.style.cssText = `
-      position:absolute; inset:0; display:flex; flex-direction:column;
+      position:fixed; inset:0; display:flex; flex-direction:column;
       align-items:center; justify-content:center; gap:8px;
       font-family:Inter,system-ui,sans-serif; pointer-events:none; opacity:0;
     `;
@@ -50,6 +49,7 @@ export default {
     overlay.appendChild(msgEl);
     gsap.set(overlay, { display: 'block', background: 'transparent' });
 
+    // Pre-compute cells sorted by distance from viewport centre
     const cx = cols / 2;
     const cy = rows / 2;
     const cells = [];
@@ -61,7 +61,6 @@ export default {
     const maxDist = Math.max(...cells.map(cell => cell.dist));
 
     function draw(radius, mode) {
-      // mode 'cover': fill cells inside radius; 'uncover': fill cells outside radius
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = COVER_COLOR;
       for (const cell of cells) {
@@ -74,21 +73,14 @@ export default {
 
     const obj = { r: 0 };
 
-    gsap.timeline({ onComplete: done })
+    return gsap.timeline({ onComplete: done })
       .to(obj, {
         r: 1, duration: COVER_DUR, ease: 'power2.in',
         onUpdate() { draw(obj.r, 'cover'); },
         onComplete() { draw(1, 'cover'); },
       })
       .call(() => {
-        sidebar.style.background  = toMode.sidebarBg;
-        content.style.background  = toMode.contentBg;
-        content.style.borderColor = toMode.contentBorder;
-        avatar.style.background   = toMode.avatarBg;
-        toggle.style.background   = toMode.toggleBg;
-        toggle.classList.toggle('is-on', toMode.toggleOn);
-        gsap.set(dot, { x: toMode.toggleOn ? 14 : 0 });
-        brand.textContent = toMode.brand;
+        els.snap(to);
         obj.r = 0;
       })
       .to(msgEl, { opacity: 1, duration: 0.15, ease: 'power1.out' })

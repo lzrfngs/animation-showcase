@@ -1,9 +1,12 @@
 /*
  * Transition Prototype — App
- * Manages mode state, sidebar nav, and transition lifecycle.
  *
- * To add a transition: create js/transitions/your-file.js and register it in registry.js.
- * The play(els, from, to, done) contract is documented in each transition file.
+ * To add a transition: create js/transitions/your-file.js, register in registry.js.
+ * Transition contract: play(els, from, to, done) → GSAPTimeline
+ *   - els      : shared DOM refs + helpers (see below)
+ *   - from/to  : mode strings ('personal' | 'work')
+ *   - done()   : call when animation fully completes
+ *   - return   : the root GSAPTimeline (allows app to kill it if needed)
  */
 
 import registry from './registry.js';
@@ -25,9 +28,6 @@ const nameEl    = document.getElementById('transition-name');
 const descEl    = document.getElementById('transition-desc');
 
 // ── Mode definitions ──────────────────────────────────────────────────────────
-//
-// Each mode defines its visual state and the message shown when leaving it.
-// Transitions read these via els.modes[from] and els.modes[to].
 
 export const MODES = {
   personal: {
@@ -58,18 +58,13 @@ export const MODES = {
   },
 };
 
-// ── State ─────────────────────────────────────────────────────────────────────
+// ── snapToMode — apply one mode's visual state to the DOM instantly ───────────
+//
+// Transitions call els.snap(to) instead of repeating these lines themselves.
+// Adding a new mode property = update MODES + this function only.
 
-let currentMode      = 'personal';
-let isTransitioning  = false;
-let activeTransition = null;
-
-// ── applyMode — instantly snap all elements to a mode's final state ───────────
-
-export function applyMode(mode) {
+function snapToMode(mode) {
   const m = MODES[mode];
-  currentMode = mode;
-
   sidebarEl.style.background  = m.sidebarBg;
   contentEl.style.background  = m.contentBg;
   contentEl.style.borderColor = m.contentBorder;
@@ -78,14 +73,53 @@ export function applyMode(mode) {
   toggleEl.classList.toggle('is-on', m.toggleOn);
   gsap.set(dotEl, { x: m.toggleOn ? 14 : 0 });
   brandEl.textContent = m.brand;
+}
 
-  // Clean up shared elements so transitions start from a known state
+// ── applyMode — full reset to a mode's canonical state ───────────────────────
+//
+// Called by done() at the end of every transition. Runs snapToMode then
+// cleans up shared overlay/message elements so the next transition starts clean.
+
+function applyMode(mode) {
+  currentMode = mode;
+  snapToMode(mode);
   msgBoxEl.style.display  = 'none';
   overlayEl.style.display = 'none';
   overlayEl.innerHTML     = '';
 }
 
+// ── Shared elements object ────────────────────────────────────────────────────
+//
+// Passed to every transition. Transitions should not import app.js directly.
+// els.snap(mode) is the single point of truth for snapping visual state.
+
+const els = {
+  mockup:  document.getElementById('mockup'),
+  panel:   document.getElementById('panel'),
+  sidebar: sidebarEl,
+  content: contentEl,
+  brand:   brandEl,
+  avatar:  avatarEl,
+  toggle:  toggleEl,
+  dot:     dotEl,
+  msgBox:  msgBoxEl,
+  msgPrim: msgPrimEl,
+  msgSec:  msgSecEl,
+  overlay: overlayEl,
+  modes:   MODES,
+  snap:    snapToMode,   // transitions call els.snap(to) to snap visual state
+};
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+let currentMode      = 'personal';
+let isTransitioning  = false;
+let activeTransition = null;
+let activeTimeline   = null; // reference to running GSAP timeline
+
 // ── Toggle interaction ────────────────────────────────────────────────────────
+
+const TIMEOUT_MS = 6000; // safety net: force-complete a stalled transition
 
 toggleEl.addEventListener('click', () => {
   if (isTransitioning || !activeTransition) return;
@@ -94,30 +128,24 @@ toggleEl.addEventListener('click', () => {
   const to   = currentMode === 'personal' ? 'work' : 'personal';
   isTransitioning = true;
 
-  // The elements object gives each transition access to everything it may need.
-  // Transitions should not import app.js — use this object instead.
-  const els = {
-    mockup:  document.getElementById('mockup'),
-    panel:   document.getElementById('panel'),
-    sidebar: sidebarEl,
-    content: contentEl,
-    brand:   brandEl,
-    avatar:  avatarEl,
-    toggle:  toggleEl,
-    dot:     dotEl,
-    msgBox:  msgBoxEl,
-    msgPrim: msgPrimEl,
-    msgSec:  msgSecEl,
-    overlay: overlayEl,
-    modes:   MODES,
-  };
+  // Kill any leftover timeline (shouldn't exist, but defensive)
+  if (activeTimeline) { activeTimeline.kill(); activeTimeline = null; }
 
-  // done() — called by the transition when fully complete.
-  // Snaps everything to the canonical final state and unlocks the toggle.
-  activeTransition.play(els, from, to, () => {
+  // Safety timeout — if done() is never called (e.g. transition crashes),
+  // force-complete after TIMEOUT_MS so the app doesn't lock up permanently.
+  const safetyTimer = setTimeout(() => {
+    console.warn(`[Transition] "${activeTransition.id}" timed out — force completing.`);
+    done(); // eslint-disable-line no-use-before-define
+  }, TIMEOUT_MS);
+
+  function done() {
+    clearTimeout(safetyTimer);
     applyMode(to);
     isTransitioning = false;
-  });
+    activeTimeline  = null;
+  }
+
+  activeTimeline = activeTransition.play(els, from, to, done);
 });
 
 // ── Sidebar nav ───────────────────────────────────────────────────────────────
@@ -139,8 +167,11 @@ registry.forEach((transition, i) => {
   nav.appendChild(item);
 });
 
+// Cache the node list after building nav — avoids re-querying DOM on each click
+const navItems = nav.querySelectorAll('.nav-item');
+
 function select(transition, navItem) {
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('is-active'));
+  navItems.forEach(el => el.classList.remove('is-active'));
   navItem.classList.add('is-active');
   activeTransition   = transition;
   nameEl.textContent = transition.title;

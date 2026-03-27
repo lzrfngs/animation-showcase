@@ -1,9 +1,6 @@
 /*
  * Fade Hold — transition
  * Library: GSAP
- *
- * Snaps to near-black. Handoff message appears, holds, then reveals new mode.
- * Overlay is position:fixed so it covers everything regardless of stacking.
  */
 
 export default {
@@ -12,8 +9,7 @@ export default {
   description: 'Snaps to near-black. A status message confirms the handoff. Fades back to reveal the new mode.',
 
   play(els, from, to, done) {
-    const { overlay, sidebar, content, brand, avatar, toggle, dot, modes } = els;
-    const toMode  = modes[to];
+    const { overlay, modes } = els;
     const fromMsg = modes[from].leaving;
 
     overlay.innerHTML = `
@@ -32,18 +28,9 @@ export default {
 
     gsap.set(overlay, { display: 'block', background: '#0a0a0a', opacity: 0 });
 
-    gsap.timeline({ onComplete: done })
+    return gsap.timeline({ onComplete: done })
       .to(overlay, { opacity: 1, duration: 0.25, ease: 'power2.in' })
-      .call(() => {
-        sidebar.style.background  = toMode.sidebarBg;
-        content.style.background  = toMode.contentBg;
-        content.style.borderColor = toMode.contentBorder;
-        avatar.style.background   = toMode.avatarBg;
-        toggle.style.background   = toMode.toggleBg;
-        toggle.classList.toggle('is-on', toMode.toggleOn);
-        gsap.set(dot, { x: toMode.toggleOn ? 14 : 0 });
-        brand.textContent = toMode.brand;
-      })
+      .call(() => { els.snap(to); })
       .to([mp, ms], { opacity: 1, duration: 0.2, stagger: 0.07, ease: 'power1.out' })
       .to({}, { duration: 0.85 })
       .to([mp, ms], { opacity: 0, duration: 0.15, ease: 'power1.in' })

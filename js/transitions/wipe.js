@@ -1,9 +1,6 @@
 /*
  * Horizontal Wipe — transition
  * Library: GSAP (clip-path)
- *
- * A hard edge sweeps left-to-right, dragging the new mode state in behind it.
- * Overlay is position:fixed — children use getBoundingClientRect() directly.
  */
 
 export default {
@@ -15,17 +12,14 @@ export default {
     const { panel, overlay, modes } = els;
     const toMode  = modes[to];
     const fromMsg = modes[from].leaving;
-
-    // Viewport-relative coords (correct for position:fixed children)
-    const pr = panel.getBoundingClientRect();
+    const pr      = panel.getBoundingClientRect();
 
     overlay.innerHTML = `
       <div id="wipe-layer" style="
         position:fixed;
         left:${pr.left}px; top:${pr.top}px;
         width:${pr.width}px; height:${pr.height}px;
-        border-radius:8px; overflow:hidden;
-        display:flex;
+        border-radius:8px; overflow:hidden; display:flex;
         clip-path:inset(0 100% 0 0 round 8px);
         box-shadow:0 24px 80px rgba(0,0,0,0.35);
       ">
@@ -48,10 +42,8 @@ export default {
 
     gsap.set(overlay, { display: 'block', background: 'transparent' });
 
-    const layer = overlay.querySelector('#wipe-layer');
-
-    gsap.timeline({ onComplete: done })
-      .to(layer, {
+    return gsap.timeline({ onComplete: done })
+      .to(overlay.querySelector('#wipe-layer'), {
         clipPath: 'inset(0 0% 0 0 round 8px)',
         duration: 0.65,
         ease: 'power3.inOut',
