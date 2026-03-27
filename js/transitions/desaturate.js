@@ -2,9 +2,8 @@
  * Desaturate → Recolor — transition
  * Library: GSAP (CSS filter)
  *
- * The panel drains to greyscale. At the grey peak the mode snaps and a
- * message appears in the content area. Then the filter lifts and the new
- * palette blooms back in.
+ * The panel drains to greyscale. Mode snaps at peak grey, message appears,
+ * then the new palette blooms back in as the filter lifts.
  */
 
 export default {
@@ -21,9 +20,7 @@ export default {
     msgSec.textContent  = fromMsg.secondary;
 
     gsap.timeline({ onComplete: done })
-      // Drain colour
-      .to(panel, { filter: 'saturate(0) brightness(0.9)', duration: 0.45, ease: 'power2.inOut' })
-      // At greyscale peak: snap values + show message
+      .to(panel, { filter: 'saturate(0) brightness(0.88)', duration: 0.4, ease: 'power2.inOut' })
       .call(() => {
         sidebar.style.background  = toMode.sidebarBg;
         content.style.background  = toMode.contentBg;
@@ -33,15 +30,14 @@ export default {
         toggle.classList.toggle('is-on', toMode.toggleOn);
         gsap.set(dot, { x: toMode.toggleOn ? 14 : 0 });
         brand.textContent = toMode.brand;
-        // Message appears during the grey hold
         msgBox.style.display = 'flex';
         gsap.fromTo(msgBox, { opacity: 0 }, { opacity: 1, duration: 0.2 });
       })
-      // Hold at grey so message reads
-      .to({}, { duration: 0.55 })
-      // Recolor — new palette blooms in
-      .to(panel, { filter: 'saturate(1) brightness(1)', duration: 0.5, ease: 'power2.inOut' })
-      // Clean up filter property
+      .to({}, { duration: 0.5 })
+      .call(() => {
+        gsap.to(msgBox, { opacity: 0, duration: 0.15 });
+      })
+      .to(panel, { filter: 'saturate(1) brightness(1)', duration: 0.45, ease: 'power2.inOut' })
       .call(() => { panel.style.filter = ''; });
   },
 };

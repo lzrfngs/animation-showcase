@@ -2,17 +2,15 @@
  * Pixelated Iris — transition
  * Library: GSAP + Canvas API
  *
- * Mosaic pixels expand from the center outward, covering the screen.
- * The mode snaps underneath at full coverage, then pixels retract to center.
- *
- * Tune PIXEL_SIZE and COVER_COLOR below.
+ * Mosaic pixels expand from center outward, covering the screen.
+ * Mode snaps underneath at full coverage, then pixels retract to center.
+ * Overlay is position:fixed — canvas fills the full viewport.
  */
 
-const PIXEL_SIZE  = 20;       // px — size of each mosaic cell
-const COVER_COLOR = '#1a1a1a'; // colour of the expanding pixels
-const COVER_DUR   = 0.5;      // seconds to fully cover
-const UNCOVER_DUR = 0.5;      // seconds to fully uncover
-const HOLD_DUR    = 0.1;      // pause at full coverage before uncovering
+const PIXEL_SIZE  = 20;
+const COVER_COLOR = '#1a1a1a';
+const COVER_DUR   = 0.5;
+const UNCOVER_DUR = 0.5;
 
 export default {
   id: 'iris',
@@ -24,8 +22,8 @@ export default {
     const toMode  = modes[to];
     const fromMsg = modes[from].leaving;
 
-    const W = overlay.offsetWidth  || window.innerWidth;
-    const H = overlay.offsetHeight || window.innerHeight;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
 
     const cols = Math.ceil(W / PIXEL_SIZE) + 1;
     const rows = Math.ceil(H / PIXEL_SIZE) + 1;
@@ -36,7 +34,6 @@ export default {
     canvas.style.cssText = 'position:absolute;top:0;left:0;display:block;';
     const ctx = canvas.getContext('2d');
 
-    // Message overlay for while screen is covered
     const msgEl = document.createElement('div');
     msgEl.style.cssText = `
       position:absolute; inset:0; display:flex; flex-direction:column;
@@ -53,7 +50,6 @@ export default {
     overlay.appendChild(msgEl);
     gsap.set(overlay, { display: 'block', background: 'transparent' });
 
-    // Pre-compute cells with distance from centre
     const cx = cols / 2;
     const cy = rows / 2;
     const cells = [];
@@ -64,13 +60,13 @@ export default {
     }
     const maxDist = Math.max(...cells.map(cell => cell.dist));
 
-    function drawAt(radius, filled) {
-      // filled=true → draw cells inside radius; false → draw cells outside
+    function draw(radius, mode) {
+      // mode 'cover': fill cells inside radius; 'uncover': fill cells outside radius
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = COVER_COLOR;
       for (const cell of cells) {
         const norm = cell.dist / maxDist;
-        if (filled ? norm <= radius : norm > radius) {
+        if (mode === 'cover' ? norm <= radius : norm > radius) {
           ctx.fillRect(cell.c * PIXEL_SIZE, cell.r * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
         }
       }
@@ -79,13 +75,11 @@ export default {
     const obj = { r: 0 };
 
     gsap.timeline({ onComplete: done })
-      // Phase 1: cover — pixels spread out from centre
       .to(obj, {
         r: 1, duration: COVER_DUR, ease: 'power2.in',
-        onUpdate() { drawAt(obj.r, true); },
-        onComplete() { drawAt(1, true); },
+        onUpdate() { draw(obj.r, 'cover'); },
+        onComplete() { draw(1, 'cover'); },
       })
-      // Snap underlying state + show message while fully covered
       .call(() => {
         sidebar.style.background  = toMode.sidebarBg;
         content.style.background  = toMode.contentBg;
@@ -98,12 +92,11 @@ export default {
         obj.r = 0;
       })
       .to(msgEl, { opacity: 1, duration: 0.15, ease: 'power1.out' })
-      .to({}, { duration: HOLD_DUR + 0.55 }) // hold so message reads
+      .to({}, { duration: 0.6 })
       .to(msgEl, { opacity: 0, duration: 0.15, ease: 'power1.in' })
-      // Phase 2: uncover — pixels retract back to centre
       .to(obj, {
         r: 1, duration: UNCOVER_DUR, ease: 'power2.out',
-        onUpdate() { drawAt(obj.r, false); },
+        onUpdate() { draw(obj.r, 'uncover'); },
         onComplete() { ctx.clearRect(0, 0, canvas.width, canvas.height); },
       });
   },

@@ -2,8 +2,8 @@
  * Fade Hold — transition
  * Library: GSAP
  *
- * Viewport snaps to near-black immediately. The handoff message appears,
- * holds, then fades away to reveal the new mode.
+ * Snaps to near-black. Handoff message appears, holds, then reveals new mode.
+ * Overlay is position:fixed so it covers everything regardless of stacking.
  */
 
 export default {
@@ -16,32 +16,24 @@ export default {
     const toMode  = modes[to];
     const fromMsg = modes[from].leaving;
 
-    // Build message inside overlay so it sits above the dark layer
     overlay.innerHTML = `
       <div style="
         display:flex; flex-direction:column; align-items:center;
         justify-content:center; height:100%; gap:8px; padding:40px;
-        text-align:center; font-family:Inter,system-ui,sans-serif;
-        pointer-events:none;
+        text-align:center; font-family:Inter,system-ui,sans-serif; pointer-events:none;
       ">
-        <p id="fp" style="font-size:13px;font-weight:500;color:#c8c8c8;opacity:0;">
-          ${fromMsg.primary}
-        </p>
-        <p id="fs" style="font-size:11px;color:#666;opacity:0;">
-          ${fromMsg.secondary}
-        </p>
+        <p id="fp" style="font-size:13px;font-weight:500;color:#c8c8c8;opacity:0;">${fromMsg.primary}</p>
+        <p id="fs" style="font-size:11px;color:#666;opacity:0;">${fromMsg.secondary}</p>
       </div>
     `;
 
     const mp = overlay.querySelector('#fp');
     const ms = overlay.querySelector('#fs');
 
-    gsap.set(overlay, { display: 'block', background: '#080808', opacity: 0 });
+    gsap.set(overlay, { display: 'block', background: '#0a0a0a', opacity: 0 });
 
     gsap.timeline({ onComplete: done })
-      // Snap to black — fast and decisive
-      .to(overlay, { opacity: 1, duration: 0.3, ease: 'power3.in' })
-      // Snap underlying state while completely hidden
+      .to(overlay, { opacity: 1, duration: 0.25, ease: 'power2.in' })
       .call(() => {
         sidebar.style.background  = toMode.sidebarBg;
         content.style.background  = toMode.contentBg;
@@ -52,12 +44,9 @@ export default {
         gsap.set(dot, { x: toMode.toggleOn ? 14 : 0 });
         brand.textContent = toMode.brand;
       })
-      // Message fades in
-      .to([mp, ms], { opacity: 1, duration: 0.2, stagger: 0.08, ease: 'power1.out' })
-      // Hold
+      .to([mp, ms], { opacity: 1, duration: 0.2, stagger: 0.07, ease: 'power1.out' })
       .to({}, { duration: 0.85 })
-      // Message out, then overlay out
       .to([mp, ms], { opacity: 0, duration: 0.15, ease: 'power1.in' })
-      .to(overlay, { opacity: 0, duration: 0.35, ease: 'power2.out' });
+      .to(overlay, { opacity: 0, duration: 0.3, ease: 'power2.out' });
   },
 };

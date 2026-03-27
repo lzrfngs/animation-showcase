@@ -372,10 +372,14 @@ body {
 
 /* ── Shared overlay ───────────────────────────────────── */
 
+/*
+ * Fixed positioning guarantees this is above everything on the page,
+ * bypassing any stacking context created by the panel's CSS transform.
+ * Transition children use getBoundingClientRect() values directly.
+ */
 .mockup__overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   display: none;
-  z-index: 20;
-  /* transitions set layout, bg, content freely */
+  z-index: 9999;
 }
