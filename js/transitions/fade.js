@@ -21,7 +21,9 @@ export default {
 
     // The veil covers the full panel but is translucent — you can see the UI shifting.
     // The message div sits after the veil in the DOM so it renders on top of it.
+    // Message is centered over the content pane (right side), not the full panel.
     const pr = panel.getBoundingClientRect();
+    const cr = content.getBoundingClientRect();
     overlay.innerHTML = `
       <div id="fade-veil" style="
         position:fixed;
@@ -33,8 +35,8 @@ export default {
       "></div>
       <div id="fade-msg" style="
         position:fixed;
-        left:${pr.left}px; top:${pr.top}px;
-        width:${pr.width}px; height:${pr.height}px;
+        left:${cr.left}px; top:${cr.top}px;
+        width:${cr.width}px; height:${cr.height}px;
         display:flex; flex-direction:column;
         align-items:center; justify-content:center; gap:6px;
         opacity:0; pointer-events:none;
