@@ -2,34 +2,39 @@
  * Pixelated Iris — transition
  * Library: GSAP + Canvas API
  *
- * Mosaic pixels expand from the panel centre outward, covering only the panel.
- * GSAP steps() ease creates a low-frame-rate, LED-matrix feel (Nothing Phone).
- * Mode snaps while fully covered, then pixels retract the same way.
+ * Single-phase reveal: new mode is snapped first, then canvas pixels dissolve
+ * away to expose it. No cover-then-uncover — just one directional wipe.
+ *
+ * Direction:
+ *   personal → work  : centre outward  (pixels vanish from middle first)
+ *   work → personal  : edge inward     (pixels vanish from outside first)
+ *
+ * Distance metric: Manhattan (|dx|+|dy|) gives a diamond shape instead of
+ * a circle. GSAP steps() ease makes it low-frame-rate / LED-matrix.
  */
 
-const PIXEL_SIZE  = 18;
-const COVER_COLOR = '#1a1a1a';
-const STEPS       = 14;          // discrete frames — lower = choppier
-const FPS         = 9;           // target frame rate for the stepped animation
-const COVER_DUR   = STEPS / FPS; // ~1.55 s
-const UNCOVER_DUR = STEPS / FPS;
-const HOLD_DUR    = 1.0;
+const PIXEL_SIZE = 18;
+const STEPS      = 14;        // discrete animation frames — lower = choppier
+const FPS        = 9;         // effective frame rate for the reveal
+const DUR        = STEPS / FPS; // ~1.55 s
+const HOLD_DUR   = 0.8;
 
 export default {
   id: 'iris',
   title: 'Pixelated Iris',
-  description: 'LED-matrix pixels expand from centre in discrete steps. Mode snaps underneath, then retracts.',
+  description: 'Diamond-shaped pixel reveal. Direction and message persist above.',
 
   play(els, from, to, done) {
     const { panel, overlay, content, modes } = els;
-    const fromMsg = modes[from].leaving;
+    const fromMsg    = modes[from].leaving;
+    const pixelColor = modes[from].sidebarBg; // old mode colour — not pure black
     const pr = panel.getBoundingClientRect();
     const cr = content.getBoundingClientRect();
 
     const cols = Math.ceil(pr.width  / PIXEL_SIZE) + 1;
     const rows = Math.ceil(pr.height / PIXEL_SIZE) + 1;
 
-    // Canvas sits exactly over the panel. CSS border-radius clips the corners.
+    // Canvas sits exactly over the panel — CSS border-radius clips the corners
     const canvas = document.createElement('canvas');
     canvas.width  = cols * PIXEL_SIZE;
     canvas.height = rows * PIXEL_SIZE;
@@ -42,7 +47,7 @@ export default {
     `;
     const ctx = canvas.getContext('2d');
 
-    // Message centered over the content pane, above the canvas in DOM order
+    // Message sits above the canvas in DOM — visible throughout the transition
     const msgEl = document.createElement('div');
     msgEl.style.cssText = `
       position:fixed;
@@ -53,69 +58,60 @@ export default {
       font-family:Inter,system-ui,sans-serif; pointer-events:none; opacity:0;
     `;
     msgEl.innerHTML = `
-      <p style="font-size:13px;font-weight:500;color:#c8c8c8;text-align:center;">${fromMsg.primary}</p>
-      <p style="font-size:11px;color:#666;text-align:center;">${fromMsg.secondary}</p>
+      <p style="font-size:13px;font-weight:500;color:#e0e0e0;text-align:center;">${fromMsg.primary}</p>
+      <p style="font-size:11px;color:#888;text-align:center;">${fromMsg.secondary}</p>
     `;
 
     overlay.innerHTML = '';
-    overlay.appendChild(canvas);
+    overlay.appendChild(canvas);   // drawn first — sits below message
     overlay.appendChild(msgEl);
     gsap.set(overlay, { display: 'block', background: 'transparent' });
 
-    // Sort cells by distance from panel centre — nearest drawn first (iris out)
+    // Snap the new mode immediately — canvas covers it while the reveal plays
+    els.snap(to);
+
+    // Sort cells by Manhattan (diamond) distance from panel centre
     const cx = cols / 2;
     const cy = rows / 2;
     const cells = [];
     for (let r = 0; r < rows; r++)
       for (let c = 0; c < cols; c++)
-        cells.push({ c, r, dist: Math.hypot(c - cx, r - cy) });
-    cells.sort((a, b) => a.dist - b.dist);
+        cells.push({ c, r, dist: Math.abs(c - cx) + Math.abs(r - cy) });
 
-    // Draw exactly the first `count` cells (cover) or all except them (uncover)
-    function drawCover(t) {
+    // personal→work: reveal from centre out (nearest cells disappear first)
+    // work→personal: reveal from edge in  (furthest cells disappear first)
+    const centreFirst = to === 'work';
+    cells.sort((a, b) => centreFirst ? a.dist - b.dist : b.dist - a.dist);
+
+    // draw: t=0 → fully covered, t=1 → fully revealed
+    function draw(t) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = COVER_COLOR;
-      const count = Math.round(t * cells.length);
-      for (let i = 0; i < count; i++)
+      ctx.fillStyle = pixelColor;
+      const keep = Math.round((1 - t) * cells.length);
+      for (let i = 0; i < keep; i++)
         ctx.fillRect(cells[i].c * PIXEL_SIZE, cells[i].r * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
     }
 
-    function drawUncover(t) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = COVER_COLOR;
-      const count = Math.round((1 - t) * cells.length);
-      for (let i = 0; i < count; i++)
-        ctx.fillRect(cells[i].c * PIXEL_SIZE, cells[i].r * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
-    }
+    // Start fully covered
+    draw(0);
 
-    const coverObj   = { t: 0 };
-    const uncoverObj = { t: 0 };
+    const obj = { t: 0 };
 
     return gsap.timeline({ onComplete: done })
-      // Cover: pixels march outward in discrete steps
-      .to(coverObj, {
+      // Message comes up immediately so it's legible throughout
+      .to(msgEl, { opacity: 1, duration: 0.25, ease: 'power1.out' })
+
+      // Pixel reveal — stepped for LED-matrix feel
+      .to(obj, {
         t: 1,
-        duration: COVER_DUR,
+        duration: DUR,
         ease: `steps(${STEPS})`,
-        onUpdate()  { drawCover(coverObj.t); },
-        onComplete(){ drawCover(1); },
-      })
-
-      // Snap mode while fully covered
-      .call(() => { els.snap(to); })
-
-      // Message fades in above the pixel field
-      .to(msgEl, { opacity: 1, duration: 0.2, ease: 'power1.out' })
-      .to({}, { duration: HOLD_DUR })
-      .to(msgEl, { opacity: 0, duration: 0.2, ease: 'power1.in' })
-
-      // Uncover: pixels retract inward in discrete steps
-      .to(uncoverObj, {
-        t: 1,
-        duration: UNCOVER_DUR,
-        ease: `steps(${STEPS})`,
-        onUpdate()  { drawUncover(uncoverObj.t); },
+        onUpdate()  { draw(obj.t); },
         onComplete(){ ctx.clearRect(0, 0, canvas.width, canvas.height); },
-      });
+      }, '<+=0.15')
+
+      // Hold, then message out
+      .to({}, { duration: HOLD_DUR })
+      .to(msgEl, { opacity: 0, duration: 0.25, ease: 'power1.in' });
   },
 };
