@@ -2,39 +2,52 @@
  * Threshold — transition
  * Library: GSAP
  *
- * The whole panel moves through a threshold — one screen departs in one
- * direction while the new one arrives from the opposite direction.
+ * Both screens are visible simultaneously during the transition.
+ * A ghost div (old mode colours) departs while the real panel (new mode)
+ * arrives from the opposite direction — they overlap the entire time.
  *
- * personal → work : old screen recedes (shrinks away), new enters from front
- * work → personal : old screen advances (grows toward viewer), new from behind
+ * personal → work : ghost shrinks back, new screen enters from in front
+ * work → personal : ghost advances forward, new screen rises from behind
  *
- * Implemented by animating scale + opacity on the panel element directly.
- * GSAP takes control of the panel transform (xPercent/yPercent preserve
- * the CSS centering) and cleans up at the end.
+ * The ghost lives in the overlay (on top). The panel is snapped to the new
+ * mode immediately underneath it. Both animate in parallel so neither
+ * disappears completely — one pushes the other, or pulls it forward.
  */
 
-const DEPART_DUR = 0.62;
-const ARRIVE_DUR = 0.62;
-const HOLD_DUR   = 0.75;
+const CROSS_DUR = 1.15;  // duration of the simultaneous cross
+const HOLD_DUR  = 0.85;
 
 export default {
-  id: 'scanline',   // keep id so registry doesn't need changing
+  id: 'scanline',
   title: 'Threshold',
-  description: 'The UI recedes or advances through a threshold. New screen enters from the opposite direction.',
+  description: 'Both screens coexist. One recedes as the other advances, moving through a threshold.',
 
   play(els, from, to, done) {
     const { panel, overlay, modes } = els;
-    const fromMsg = modes[from].leaving;
-    const pr      = panel.getBoundingClientRect();
+    const fromMode = modes[from];
+    const fromMsg  = fromMode.leaving;
+    const pr       = panel.getBoundingClientRect();
 
-    // personal→work: old screen recedes (scale down), new arrives from front (scale down to 1)
-    // work→personal: old screen advances (scale up),  new arrives from behind (scale up to 1)
-    const recede       = to === 'work';
-    const departScale  = recede ? 0.84 : 1.16;
-    const arrivalScale = recede ? 1.16 : 0.84;
+    // personal→work: ghost recedes (shrinks), new panel enters from front (large→1)
+    // work→personal: ghost advances (grows),  new panel rises from behind (small→1)
+    const recede      = to === 'work';
+    const ghostTarget = recede ? 0.82 : 1.18;   // where the ghost ends up
+    const panelStart  = recede ? 1.18 : 0.82;   // where the panel starts
 
-    // Message with dark pill backdrop — centered to full panel, above everything
+    // Ghost: a flat reproduction of the old mode's two-column layout.
+    // It sits in the overlay on top of the panel throughout the transition.
     overlay.innerHTML = `
+      <div id="thresh-ghost" style="
+        position:fixed;
+        left:${pr.left}px; top:${pr.top}px;
+        width:${pr.width}px; height:${pr.height}px;
+        border-radius:8px; overflow:hidden;
+        display:flex;
+      ">
+        <div style="width:26%;flex-shrink:0;background:${fromMode.sidebarBg};"></div>
+        <div style="flex:1;background:${fromMode.contentBg};border:1px solid ${fromMode.contentBorder};border-left:none;"></div>
+      </div>
+
       <div style="
         position:fixed;
         left:${pr.left}px; top:${pr.top}px;
@@ -58,44 +71,40 @@ export default {
     `;
     gsap.set(overlay, { display: 'block', background: 'transparent' });
 
-    const msg = overlay.querySelector('#thresh-msg');
+    const ghost = overlay.querySelector('#thresh-ghost');
+    const msg   = overlay.querySelector('#thresh-msg');
 
-    // Hand the panel transform to GSAP — xPercent/yPercent replicate the CSS
-    // translate(-50%,-50%) centering so scale animates around the panel centre
-    gsap.set(panel, { xPercent: -50, yPercent: -50, scale: 1, opacity: 1 });
+    // Snap panel to new mode immediately — it sits behind the ghost
+    els.snap(to);
+
+    // Hand the panel transform to GSAP. xPercent/yPercent replicate the CSS
+    // translate(-50%,-50%) so scale animates cleanly around the panel centre.
+    gsap.set(panel, { xPercent: -50, yPercent: -50, scale: panelStart, opacity: 0 });
 
     return gsap.timeline({ onComplete: done })
 
-      // Message appears as departure begins
-      .to(msg, { opacity: 1, duration: 0.25, ease: 'power1.out' })
-
-      // Old screen departs
-      .to(panel, {
-        scale:   departScale,
+      // Ghost and panel animate in parallel — both screens visible at once
+      .to(ghost, {
+        scale:   ghostTarget,
         opacity: 0,
-        duration: DEPART_DUR,
-        ease: 'power2.inOut',
-      }, '<')
-
-      // Snap new mode; reposition panel at the opposite end of the z-axis
-      .call(() => {
-        els.snap(to);
-        gsap.set(panel, { scale: arrivalScale, opacity: 0 });
+        duration: CROSS_DUR,
+        ease: 'power3.inOut',
       })
-
-      // New screen arrives — settles into place
       .to(panel, {
         scale:   1,
         opacity: 1,
-        duration: ARRIVE_DUR,
-        ease: 'power2.inOut',
-      })
+        duration: CROSS_DUR,
+        ease: 'power3.inOut',
+      }, '<')
+
+      // Message comes up as the cross begins and holds until after
+      .to(msg, { opacity: 1, duration: 0.3, ease: 'power1.out' }, '<+=0.1')
 
       // Hold, then message out
       .to({}, { duration: HOLD_DUR })
-      .to(msg, { opacity: 0, duration: 0.25, ease: 'power1.in' })
+      .to(msg, { opacity: 0, duration: 0.3, ease: 'power1.in' })
 
-      // Return transform control to CSS
+      // Return transform control to CSS so subsequent transitions aren't affected
       .call(() => { gsap.set(panel, { clearProps: 'transform,opacity' }); });
   },
 };
