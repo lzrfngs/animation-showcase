@@ -167,17 +167,24 @@ body {
 .mockup__wallpaper {
   position: absolute;
   inset: 0;
-  background: url('ui-exports/wallpaper.png') center center / cover no-repeat;
+  background: url('ui-exports/Wallpaper.png') center center / cover no-repeat;
 }
 
 /* ── Settings panel ───────────────────────────────────── */
 
+/*
+ * Panel is sized to mirror the Figma proportions (942×688 on 1920 canvas).
+ * It's ~55% of viewport width, maintaining the 1.368:1 aspect ratio.
+ * CSS custom property so height can reference width.
+ */
 .mockup__panel {
+  --panel-w: clamp(600px, 55vw, 980px);
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 640px;
+  width: var(--panel-w);
+  height: calc(var(--panel-w) / 1.368);
   display: flex;
   border-radius: 8px;
   overflow: hidden;
@@ -187,9 +194,11 @@ body {
 /* ── Sidebar (mockup) ────────────────────────────────── */
 
 .mockup__sidebar {
-  width: 170px;
+  width: 26%;  /* ~170px at 640px panel, scales with panel */
   flex-shrink: 0;
   padding: 16px 0 20px;
+  display: flex;
+  flex-direction: column;
   /* background set by JS via applyMode */
 }
 
@@ -222,7 +231,10 @@ body {
   padding: 0 14px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 9px;
+  flex: 1;
+  justify-content: flex-start;
+  padding-top: 8px;
 }
 
 .mockup__np-row {
@@ -242,9 +254,9 @@ body {
 .mockup__content {
   flex: 1;
   padding: 20px 28px;
-  border-left: none;
   border: 1px solid transparent;
   border-left: none;
+  overflow: hidden;
   /* background + border-color set by JS */
 }
 
