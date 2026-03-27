@@ -9,15 +9,19 @@
  *   personal → work  : centre outward  (pixels vanish from middle first)
  *   work → personal  : edge inward     (pixels vanish from outside first)
  *
- * Distance metric: Manhattan (|dx|+|dy|) gives a diamond shape instead of
- * a circle. GSAP steps() ease makes it low-frame-rate / LED-matrix.
+ * Distance metric: Manhattan (|dx|+|dy|) gives a diamond shape.
+ * GSAP steps() ease → chunky LED-matrix frames.
+ * Each frame, pixels near the reveal boundary get 16-level grey alpha —
+ * the wipe edge looks dithered and alive rather than a hard binary line.
  */
 
-const PIXEL_SIZE = 18;
-const STEPS      = 14;        // discrete animation frames — lower = choppier
-const FPS        = 9;         // effective frame rate for the reveal
-const DUR        = STEPS / FPS; // ~1.55 s
-const HOLD_DUR   = 0.8;
+const PIXEL_SIZE  = 18;
+const STEPS       = 14;          // discrete frames — lower = choppier
+const FPS         = 9;
+const DUR         = STEPS / FPS; // ~1.55 s
+const HOLD_DUR    = 0.8;
+const GREY_LEVELS = 16;          // alpha quantization levels at the boundary
+const BAND        = 0.20;        // fraction of the sorted-cell range that transitions
 
 export default {
   id: 'iris',
@@ -84,12 +88,38 @@ export default {
     cells.sort((a, b) => centreFirst ? a.dist - b.dist : b.dist - a.dist);
 
     // draw: t=0 → fully covered, t=1 → fully revealed
+    // Each cell's opacity is determined by how far it sits from the reveal boundary.
+    // Within a band of BAND width, alpha is quantized to GREY_LEVELS discrete steps.
+    // Deterministic per-cell noise breaks up the perfectly uniform gradient edge.
+    const n = cells.length;
+    ctx.fillStyle = pixelColor;
+
     function draw(t) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = pixelColor;
-      const keep = Math.round((1 - t) * cells.length);
-      for (let i = 0; i < keep; i++)
+      for (let i = 0; i < n; i++) {
+        // cellProgress: 0 = first to reveal, 1 = last to reveal
+        const cellProgress = i / n;
+        // How far ahead of the current reveal front is this cell?
+        // positive → still covered, negative → already revealed
+        const diff = cellProgress - t;
+
+        let raw; // 0 = fully revealed, 1 = fully covered
+        if (diff <= 0)    raw = 0;
+        else if (diff >= BAND) raw = 1;
+        else raw = diff / BAND;
+
+        // Subtle deterministic noise per cell — breaks uniform banding
+        const noise = (Math.sin(cells[i].c * 6.1 + cells[i].r * 9.7) * 0.5 + 0.5 - 0.5) * 0.07;
+        raw = Math.max(0, Math.min(1, raw + noise));
+
+        // Quantize to GREY_LEVELS
+        const level = Math.round(raw * (GREY_LEVELS - 1)) / (GREY_LEVELS - 1);
+        if (level === 0) continue;
+
+        ctx.globalAlpha = level;
         ctx.fillRect(cells[i].c * PIXEL_SIZE, cells[i].r * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+      }
+      ctx.globalAlpha = 1;
     }
 
     // Start fully covered
