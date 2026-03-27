@@ -14,5 +14,6 @@ import ring       from './transitions/ring.js';
 import iris       from './transitions/iris.js';
 import scanline   from './transitions/scanline.js';
 import desaturate from './transitions/desaturate.js';
+import cipher     from './transitions/cipher.js';
 
-export default [fade, wipe, ring, iris, scanline, desaturate];
+export default [fade, wipe, ring, iris, scanline, desaturate, cipher];
