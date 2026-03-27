@@ -1,6 +1,11 @@
 /*
  * Horizontal Wipe — transition
  * Library: GSAP (clip-path)
+ *
+ * A hard edge sweeps left-to-right across the panel, revealing the new mode.
+ * clip-path uses plain inset() values (no 'round' keyword) — GSAP can't
+ * reliably interpolate the round shorthand. Rounded corners come from
+ * border-radius + overflow:hidden on the layer itself.
  */
 
 export default {
@@ -20,7 +25,6 @@ export default {
         left:${pr.left}px; top:${pr.top}px;
         width:${pr.width}px; height:${pr.height}px;
         border-radius:8px; overflow:hidden; display:flex;
-        clip-path:inset(0 100% 0 0 round 8px);
         box-shadow:0 24px 80px rgba(0,0,0,0.35);
       ">
         <div style="width:26%;flex-shrink:0;background:${toMode.sidebarBg};"></div>
@@ -42,12 +46,20 @@ export default {
 
     gsap.set(overlay, { display: 'block', background: 'transparent' });
 
+    const layer = overlay.querySelector('#wipe-layer');
+
+    // Set initial clip-path via gsap.set so GSAP knows the start value for sure.
+    // No 'round' keyword — rounded corners handled by border-radius above.
+    gsap.set(layer, { clipPath: 'inset(0 100% 0 0)' });
+
     return gsap.timeline({ onComplete: done })
-      .to(overlay.querySelector('#wipe-layer'), {
-        clipPath: 'inset(0 0% 0 0 round 8px)',
-        duration: 0.65,
-        ease: 'power3.inOut',
-      })
-      .to({}, { duration: 0.7 });
+      // Sweep in — power2.out starts immediately and visibly, decelerates at end
+      .to(layer, { clipPath: 'inset(0 0% 0 0)', duration: 0.55, ease: 'power2.out' })
+      // Snap underlying panel while it's covered by the wipe-layer
+      .call(() => { els.snap(to); })
+      // Hold so message is readable
+      .to({}, { duration: 0.55 })
+      // Fade wipe-layer out — reveals the already-snapped panel underneath
+      .to(layer, { opacity: 0, duration: 0.2, ease: 'power1.in' });
   },
 };
