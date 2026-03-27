@@ -1,94 +1,154 @@
 /*
- * Animation Showcase — App
- * Handles navigation, demo lifecycle (init / destroy), and code display.
+ * Transition Prototype — App
+ * Manages mode state, sidebar nav, and transition lifecycle.
+ *
+ * To add a transition: create js/transitions/your-file.js and register it in registry.js.
+ * The play(els, from, to, done) contract is documented in each transition file.
  */
 
 import registry from './registry.js';
 
-const nav        = document.getElementById('nav');
-const viewport   = document.getElementById('demo-viewport');
-const titleEl    = document.getElementById('demo-title');
-const descEl     = document.getElementById('demo-description');
-const numEl      = document.getElementById('demo-num');
-const libEl      = document.getElementById('demo-lib');
-const codeEl     = document.getElementById('code-display');
+// ── DOM refs ──────────────────────────────────────────────────────────────────
 
-let currentCleanup = null;
+const nav       = document.getElementById('nav');
+const sidebarEl = document.getElementById('mockup-sidebar');
+const contentEl = document.getElementById('mockup-content');
+const brandEl   = document.getElementById('brand-name');
+const avatarEl  = document.getElementById('avatar');
+const toggleEl  = document.getElementById('toggle');
+const dotEl     = document.getElementById('toggle-dot');
+const msgBoxEl  = document.getElementById('message-box');
+const msgPrimEl = document.getElementById('message-primary');
+const msgSecEl  = document.getElementById('message-secondary');
+const overlayEl = document.getElementById('overlay');
+const nameEl    = document.getElementById('transition-name');
+const descEl    = document.getElementById('transition-desc');
 
-// ── Build navigation ──────────────────────────────────────────────────────────
+// ── Mode definitions ──────────────────────────────────────────────────────────
+//
+// Each mode defines its visual state and the message shown when leaving it.
+// Transitions read these via els.modes[from] and els.modes[to].
 
-registry.forEach(library => {
-  const section = document.createElement('div');
-  section.className = 'nav-section';
+export const MODES = {
+  personal: {
+    sidebarBg:     '#514e4e',
+    contentBg:     '#cfcfcf',
+    contentBorder: '#bebebe',
+    avatarBg:      '#888888',
+    toggleBg:      '#b0b0b0',
+    toggleOn:      false,
+    brand:         'Copilot',
+    leaving: {
+      primary:   'Enabling Copilot Work',
+      secondary: 'Your personal profile remains private',
+    },
+  },
+  work: {
+    sidebarBg:     '#e2e2e2',
+    contentBg:     '#ffffff',
+    contentBorder: '#d0d0d0',
+    avatarBg:      '#5ab4e0',
+    toggleBg:      '#5ab4e0',
+    toggleOn:      true,
+    brand:         'Copilot Work',
+    leaving: {
+      primary:   'Switching to your personal Copilot',
+      secondary: 'Your work data will remain separate and secure',
+    },
+  },
+};
 
-  const sectionLabel = document.createElement('div');
-  sectionLabel.className = 'nav-section__label';
-  sectionLabel.textContent = library.name;
-  section.appendChild(sectionLabel);
+// ── State ─────────────────────────────────────────────────────────────────────
 
-  library.demos.forEach(demo => {
-    const item = document.createElement('div');
-    item.className = 'nav-item';
-    item.dataset.libraryId = library.id;
-    item.dataset.demoId    = demo.id;
+let currentMode      = 'personal';
+let isTransitioning  = false;
+let activeTransition = null;
 
-    const num = document.createElement('span');
-    num.className = 'nav-item__num';
-    num.textContent = demo.label;
+// ── applyMode — instantly snap all elements to a mode's final state ───────────
 
-    const name = document.createElement('span');
-    name.textContent = demo.title;
+export function applyMode(mode) {
+  const m = MODES[mode];
+  currentMode = mode;
 
-    item.appendChild(num);
-    item.appendChild(name);
-    item.addEventListener('click', () => loadDemo(library, demo, item));
-    section.appendChild(item);
+  sidebarEl.style.background  = m.sidebarBg;
+  contentEl.style.background  = m.contentBg;
+  contentEl.style.borderColor = m.contentBorder;
+  avatarEl.style.background   = m.avatarBg;
+  toggleEl.style.background   = m.toggleBg;
+  toggleEl.classList.toggle('is-on', m.toggleOn);
+  gsap.set(dotEl, { x: m.toggleOn ? 14 : 0 });
+  brandEl.textContent = m.brand;
+
+  // Clean up shared elements so transitions start from a known state
+  msgBoxEl.style.display  = 'none';
+  overlayEl.style.display = 'none';
+  overlayEl.innerHTML     = '';
+}
+
+// ── Toggle interaction ────────────────────────────────────────────────────────
+
+toggleEl.addEventListener('click', () => {
+  if (isTransitioning || !activeTransition) return;
+
+  const from = currentMode;
+  const to   = currentMode === 'personal' ? 'work' : 'personal';
+  isTransitioning = true;
+
+  // The elements object gives each transition access to everything it may need.
+  // Transitions should not import app.js — use this object instead.
+  const els = {
+    mockup:  document.getElementById('mockup'),
+    panel:   document.getElementById('panel'),
+    sidebar: sidebarEl,
+    content: contentEl,
+    brand:   brandEl,
+    avatar:  avatarEl,
+    toggle:  toggleEl,
+    dot:     dotEl,
+    msgBox:  msgBoxEl,
+    msgPrim: msgPrimEl,
+    msgSec:  msgSecEl,
+    overlay: overlayEl,
+    modes:   MODES,
+  };
+
+  // done() — called by the transition when fully complete.
+  // Snaps everything to the canonical final state and unlocks the toggle.
+  activeTransition.play(els, from, to, () => {
+    applyMode(to);
+    isTransitioning = false;
   });
-
-  nav.appendChild(section);
 });
 
-// ── Demo lifecycle ────────────────────────────────────────────────────────────
+// ── Sidebar nav ───────────────────────────────────────────────────────────────
 
-function loadDemo(library, demo, navItem) {
-  // Teardown previous
-  if (currentCleanup) {
-    currentCleanup();
-    currentCleanup = null;
-  }
-  viewport.innerHTML = '';
+registry.forEach((transition, i) => {
+  const item = document.createElement('div');
+  item.className = 'nav-item';
 
-  // Update active nav state
+  const num = document.createElement('span');
+  num.className = 'nav-item__num';
+  num.textContent = String(i + 1).padStart(2, '0');
+
+  const label = document.createElement('span');
+  label.textContent = transition.title;
+
+  item.appendChild(num);
+  item.appendChild(label);
+  item.addEventListener('click', () => select(transition, item));
+  nav.appendChild(item);
+});
+
+function select(transition, navItem) {
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('is-active'));
-  if (navItem) navItem.classList.add('is-active');
-
-  // Update header
-  numEl.textContent   = demo.label;
-  libEl.textContent   = library.name;
-  titleEl.textContent = demo.title;
-  descEl.textContent  = demo.description;
-
-  // Update code — wait for Prism to be ready
-  codeEl.textContent = demo.code;
-  if (window.Prism) {
-    Prism.highlightElement(codeEl);
-  } else {
-    // Prism loads deferred; re-highlight once available
-    window.addEventListener('load', () => Prism.highlightElement(codeEl), { once: true });
-  }
-
-  // Init demo — slight delay so viewport has correct dimensions
-  requestAnimationFrame(() => {
-    currentCleanup = demo.init(viewport) ?? null;
-  });
+  navItem.classList.add('is-active');
+  activeTransition   = transition;
+  nameEl.textContent = transition.title;
+  descEl.textContent = transition.description;
 }
 
-// ── Load first demo on start ──────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
 
-const firstLibrary = registry[0];
-const firstDemo    = firstLibrary?.demos[0];
-const firstNavItem = nav.querySelector('.nav-item');
-
-if (firstLibrary && firstDemo) {
-  loadDemo(firstLibrary, firstDemo, firstNavItem);
-}
+applyMode('personal');
+const firstItem = nav.querySelector('.nav-item');
+if (firstItem) firstItem.click();

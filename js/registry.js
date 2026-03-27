@@ -1,17 +1,18 @@
-// Animation library registry
-// To add a new library: import its demos array and add an entry below.
+/*
+ * Transition Registry
+ *
+ * To add a new transition:
+ *   1. Create js/transitions/your-transition.js
+ *      — export default { id, title, description, play(els, from, to, done) {} }
+ *   2. Import it below
+ *   3. Add it to the array — order determines sidebar order
+ */
 
-import gsapDemos from './demos/gsap/index.js';
+import fade       from './transitions/fade.js';
+import wipe       from './transitions/wipe.js';
+import ring       from './transitions/ring.js';
+import iris       from './transitions/iris.js';
+import scanline   from './transitions/scanline.js';
+import desaturate from './transitions/desaturate.js';
 
-const registry = [
-  {
-    id:    'gsap',
-    name:  'GSAP',
-    demos: gsapDemos,
-  },
-  // Future libraries:
-  // { id: 'threejs', name: 'Three.js', demos: threejsDemos },
-  // { id: 'p5',      name: 'p5.js',    demos: p5Demos      },
-];
-
-export default registry;
+export default [fade, wipe, ring, iris, scanline, desaturate];

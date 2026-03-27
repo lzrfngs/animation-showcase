@@ -1,6 +1,7 @@
 /*
- * Animation Showcase — Styles
- * Minimal, monochrome, structural
+ * Copilot Transition Prototype — Styles
+ * Layout: sidebar + viewport + info bar
+ * Mockup: faithful reproduction of Figma designs
  */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -8,16 +9,15 @@
 :root {
   --bg:          #0c0c0c;
   --surface:     #111111;
-  --surface-alt: #181818;
   --border:      #202020;
   --text:        #b8b8b8;
   --text-dim:    #484848;
   --text-bright: #e8e8e8;
   --sidebar-w:   224px;
-  --header-h:    84px;
-  --code-w:      320px;
+  --info-h:      56px;
   --font-sans:   'IBM Plex Sans', system-ui, sans-serif;
-  --font-mono:   'IBM Plex Mono', 'Courier New', monospace;
+  --font-mono:   'IBM Plex Mono', monospace;
+  --font-ui:     'Inter', system-ui, sans-serif;
 }
 
 html, body { height: 100%; overflow: hidden; }
@@ -68,14 +68,12 @@ body {
 }
 
 .sidebar__nav {
-  padding: 20px 0 20px;
+  padding: 20px 0;
   flex: 1;
 }
 
-.nav-section { margin-bottom: 4px; }
-
 .nav-section__label {
-  padding: 10px 22px 6px;
+  padding: 10px 22px 8px;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -93,6 +91,7 @@ body {
   font-size: 11px;
   letter-spacing: 0.03em;
   border-left: 1px solid transparent;
+  -webkit-user-select: none;
   user-select: none;
   transition: color 80ms ease, border-color 80ms ease;
 }
@@ -122,132 +121,249 @@ body {
   min-width: 0;
 }
 
-/* ── Demo Header ─────────────────────────────────────── */
+/* ── Viewport ────────────────────────────────────────── */
 
-.demo-header {
-  height: var(--header-h);
-  min-height: var(--header-h);
-  padding: 16px 32px 14px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-.demo-meta {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 6px;
-}
-
-.demo-num,
-.demo-lib {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  color: var(--text-dim);
-}
-
-.demo-title {
-  font-size: 40px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--text-bright);
-  letter-spacing: -0.025em;
-  margin-bottom: 0;
-}
-
-.demo-description {
-  display: none;
-}
-
-/* ── Content Row ─────────────────────────────────────── */
-
-.content-row {
-  flex: 1;
-  display: flex;
-  flex-direction: row;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* ── Demo Viewport ───────────────────────────────────── */
-
-.demo-viewport {
+.viewport {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: var(--bg);
-  min-width: 0;
+  min-height: 0;
 }
 
-/* ── Code Panel ──────────────────────────────────────── */
+/* ── Info bar ─────────────────────────────────────────── */
 
-.code-panel {
-  width: var(--code-w);
-  min-width: var(--code-w);
-  border-left: 1px solid var(--border);
-  background: var(--surface);
+.info-bar {
+  height: var(--info-h);
+  min-height: var(--info-h);
+  border-top: 1px solid var(--border);
+  padding: 0 32px;
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.code-panel__header {
-  padding: 12px 20px 10px;
-  border-bottom: 1px solid var(--border);
+  align-items: center;
+  gap: 20px;
   flex-shrink: 0;
 }
 
-.code-label {
-  display: block;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  color: var(--text-dim);
-  margin-bottom: 6px;
-}
-
-.code-desc {
+.info-bar__name {
+  font-family: var(--font-mono);
   font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-bright);
+  white-space: nowrap;
+}
+
+.info-bar__desc {
+  font-size: 11px;
   color: var(--text-dim);
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
-.code-pre {
+/* ── Mockup shell ─────────────────────────────────────── */
+
+.mockup {
+  position: absolute;
+  inset: 0;
+}
+
+.mockup__wallpaper {
+  position: absolute;
+  inset: 0;
+  background: url('ui-exports/wallpaper.png') center center / cover no-repeat;
+}
+
+/* ── Settings panel ───────────────────────────────────── */
+
+.mockup__panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 640px;
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Sidebar (mockup) ────────────────────────────────── */
+
+.mockup__sidebar {
+  width: 170px;
+  flex-shrink: 0;
+  padding: 16px 0 20px;
+  /* background set by JS via applyMode */
+}
+
+.mockup__logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px 16px;
+}
+
+.mockup__logo-mark {
+  width: 12px;
+  height: 10px;
+  border-radius: 2px;
+  background: rgba(128, 128, 128, 0.5);
+  flex-shrink: 0;
+}
+
+.mockup__brand {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(128, 128, 128, 0.7);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+/* Placeholder nav rows */
+.mockup__nav-placeholder {
+  padding: 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.mockup__np-row {
+  height: 7px;
+  border-radius: 2px;
+  background: rgba(128, 128, 128, 0.25);
+  width: 100%;
+}
+
+.mockup__np-row--xs   { width: 30%;  height: 9px; }
+.mockup__np-row--sm   { width: 45%; }
+.mockup__np-row--md   { width: 65%; }
+.mockup__np-row--full { width: 90%; }
+
+/* ── Content area (mockup) ───────────────────────────── */
+
+.mockup__content {
   flex: 1;
-  overflow: auto;
-  padding: 16px 20px;
-  margin: 0;
-  background: transparent !important;
-  font-family: var(--font-mono) !important;
-  font-size: 11px !important;
-  line-height: 1.75 !important;
+  padding: 20px 28px;
+  border-left: none;
+  border: 1px solid transparent;
+  border-left: none;
+  /* background + border-color set by JS */
 }
 
-/* ── Prism overrides — monochrome ────────────────────── */
-
-code[class*="language-"],
-pre[class*="language-"] {
-  background: transparent !important;
-  font-family: var(--font-mono) !important;
-  font-size: 11px !important;
-  line-height: 1.75 !important;
-  color: var(--text) !important;
-  text-shadow: none !important;
+.mockup__section-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 500;
+  color: #747474;
+  margin-bottom: 14px;
+  letter-spacing: 0.01em;
 }
 
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata          { color: #383838 !important; }
-.token.keyword,
-.token.tag            { color: #888 !important; }
-.token.string         { color: #888 !important; }
-.token.number,
-.token.boolean        { color: #999 !important; }
-.token.function       { color: var(--text-bright) !important; }
-.token.class-name     { color: var(--text) !important; }
-.token.punctuation    { color: #555 !important; }
-.token.operator       { color: #777 !important; }
-.token.property       { color: var(--text) !important; }
+.mockup__user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.mockup__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  /* background set by JS */
+}
+
+.mockup__user-info {}
+
+.mockup__user-name {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: #747474;
+  margin-bottom: 2px;
+}
+
+.mockup__user-email {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: #8a8a8a;
+}
+
+.mockup__toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid rgba(0,0,0,0.08);
+}
+
+.mockup__toggle-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: #747474;
+}
+
+.mockup__toggle-label strong {
+  font-weight: 600;
+}
+
+/* The toggle button */
+.mockup__toggle {
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  /* background set by JS */
+  transition: background 0.2s ease;
+}
+
+.mockup__toggle-dot {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  /* x-position animated by GSAP */
+}
+
+/* Message box — shown mid-transition */
+.mockup__message {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 32px 24px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  text-align: center;
+  gap: 6px;
+}
+
+.mockup__message-primary {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+}
+
+.mockup__message-secondary {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: #888;
+}
+
+/* ── Shared overlay ───────────────────────────────────── */
+
+.mockup__overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  z-index: 20;
+  /* transitions set layout, bg, content freely */
+}
