@@ -1,201 +1,108 @@
 /*
  * Cipher — transition
- * Library: GSAP + Canvas API
+ * Library: GSAP
  *
- * Each panel element is individually encrypted in staggered sequence:
- *   — Brand text scrambles through hex characters
- *   — Sidebar fills with flickering grey columns (corrupted scan data)
- *   — Content area floods with a monospace character grid (live code stream)
- *   — Avatar pulses with concentric pixel rings
- *   — Toggle glitches between both mode states
+ * Each panel region is sealed behind a clean dark plane in staggered sequence:
+ * sidebar first, then the avatar, then the content area. No noise, no scramble —
+ * information becomes featureless, locked behind geometric absence.
  *
- * Everything locks. Mode snaps underneath. The canvas fades away cleanly,
- * revealing the new space as if it was always there behind the encryption.
+ * Mode snaps while everything is sealed. All planes release simultaneously,
+ * revealing the new space clean.
  */
 
-const CRYPTO = '0123456789ABCDEFabcdef.:_-|=+/\\';
-const CHAR_W = 5;   // monospace grid cell width  (px)
-const CHAR_H = 9;   // monospace grid cell height (px)
-const COL_W  = 3;   // sidebar noise column width (px)
-const RING_W = 4;   // avatar ring strip thickness (px)
-
-function rchar() {
-  return CRYPTO[Math.floor(Math.random() * CRYPTO.length)];
-}
+const LOCK_COLOR = '#111111';
 
 export default {
   id: 'cipher',
   title: 'Cipher',
-  description: 'Each element encrypts individually. Old space locks and closes. New space reveals clean.',
+  description: 'Each region locks behind a clean plane. Old space sealed. New space revealed.',
 
   play(els, from, to, done) {
-    const { panel, overlay, sidebar, content, avatar, toggle, dot, brand, modes } = els;
-    const fromMode = modes[from];
-    const toMode   = modes[to];
-    const fromMsg  = fromMode.leaving;
-    const pr       = panel.getBoundingClientRect();
-    const cw = pr.width, ch = pr.height;
+    const { panel, overlay, sidebar, content, avatar, modes } = els;
+    const fromMsg = modes[from].leaving;
+    const pr = panel.getBoundingClientRect();
+    const sR = sidebar.getBoundingClientRect();
+    const cR = content.getBoundingClientRect();
+    const aR = avatar.getBoundingClientRect();
 
-    // ── Canvas ───────────────────────────────────────────────────────────────
-    const canvas = document.createElement('canvas');
-    canvas.width  = cw;
-    canvas.height = ch;
-    canvas.style.cssText = `
-      position:fixed; top:${pr.top}px; left:${pr.left}px;
-      width:${cw}px; height:${ch}px;
-      display:block; pointer-events:none; border-radius:8px;
-    `;
-    const ctx = canvas.getContext('2d');
-    ctx.font = `${CHAR_H}px "IBM Plex Mono", monospace`;
+    // Clean geometric cover elements — no texture, no noise
+    function makeCover(r, extraStyle = '') {
+      const d = document.createElement('div');
+      d.style.cssText = `
+        position:fixed;
+        left:${r.left}px; top:${r.top}px;
+        width:${r.width}px; height:${r.height}px;
+        background:${LOCK_COLOR};
+        ${extraStyle}
+      `;
+      return d;
+    }
 
-    // ── Message ──────────────────────────────────────────────────────────────
-    const msgEl = document.createElement('div');
-    msgEl.style.cssText = `
+    const cvSide = makeCover(sR, 'border-radius:8px 0 0 8px;');
+    const cvCont = makeCover(cR, 'border-radius:0 8px 8px 0;');
+    const cvAvat = makeCover(aR, 'border-radius:50%;');
+
+    // Message — centred to full panel, above the covers
+    const msgWrap = document.createElement('div');
+    msgWrap.style.cssText = `
       position:fixed; left:${pr.left}px; top:${pr.top}px;
-      width:${cw}px; height:${ch}px;
+      width:${pr.width}px; height:${pr.height}px;
       display:flex; align-items:center; justify-content:center;
-      pointer-events:none; opacity:0;
+      pointer-events:none;
     `;
-    msgEl.innerHTML = `
-      <div style="
-        background:rgba(8,8,8,0.75);
+    msgWrap.innerHTML = `
+      <div id="cv-msg" style="
+        background:rgba(8,8,8,0.72);
         border:1px solid rgba(255,255,255,0.07);
         border-radius:7px; padding:10px 20px;
         display:flex; flex-direction:column; align-items:center; gap:5px;
-        backdrop-filter:blur(4px);
+        backdrop-filter:blur(4px); opacity:0;
       ">
-        <p style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;color:#d0d0d0;text-align:center;margin:0;">${fromMsg.primary}</p>
-        <p style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#555;text-align:center;margin:0;">${fromMsg.secondary}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:13px;font-weight:500;color:#e0e0e0;text-align:center;margin:0;">${fromMsg.primary}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:11px;color:#888;text-align:center;margin:0;">${fromMsg.secondary}</p>
       </div>
     `;
 
     overlay.innerHTML = '';
-    overlay.appendChild(canvas);
-    overlay.appendChild(msgEl);
+    overlay.appendChild(cvSide);
+    overlay.appendChild(cvCont);
+    overlay.appendChild(cvAvat);  // avatar cover above content cover
+    overlay.appendChild(msgWrap); // message always on top
     gsap.set(overlay, { display: 'block', background: 'transparent' });
 
-    // ── Element rects in canvas space ─────────────────────────────────────────
-    function toCanvas(el) {
-      const r = el.getBoundingClientRect();
-      return { x: r.left - pr.left, y: r.top - pr.top, w: r.width, h: r.height };
-    }
-    const sRect = toCanvas(sidebar);
-    const cRect = toCanvas(content);
-    const aRect = toCanvas(avatar);
+    const msgEl = msgWrap.querySelector('#cv-msg');
 
-    // ── Per-element encryption progress (0–1), driven by GSAP tweens ─────────
-    const ep = { side: 0, cont: 0, avat: 0 };
+    // Covers start collapsed — will slide in from their left edge
+    gsap.set(cvSide, { scaleX: 0, transformOrigin: 'left center' });
+    gsap.set(cvCont, { scaleX: 0, transformOrigin: 'left center' });
+    gsap.set(cvAvat, { scale:  0, transformOrigin: 'center center' });
 
-    // ── Brand scramble ────────────────────────────────────────────────────────
-    const origBrand = brand.textContent;
-    let brandTimer  = null;
-
-    function startBrandScramble() {
-      brandTimer = setInterval(() => {
-        brand.textContent = Array.from({ length: origBrand.length }, rchar).join('');
-      }, 55);
-    }
-
-    function stopBrandScramble(resolvedText) {
-      clearInterval(brandTimer);
-      brand.textContent = resolvedText;
-    }
-
-    // ── Toggle glitch ─────────────────────────────────────────────────────────
-    let toggleTimer = null;
-
-    function startToggleGlitch() {
-      toggleTimer = setInterval(() => {
-        gsap.set(dot, { x: Math.floor(Math.random() * 15) });
-        gsap.set(toggle, {
-          backgroundColor: Math.random() > 0.5 ? fromMode.toggleBg : toMode.toggleBg,
-        });
-      }, 70);
-    }
-
-    function stopToggleGlitch() {
-      clearInterval(toggleTimer);
-    }
-
-    // ── Canvas draw functions (called every gsap.ticker frame) ────────────────
-    function drawSide(p) {
-      // Flickering grey columns — corrupted scan data
-      for (let x = sRect.x; x < sRect.x + sRect.w; x += COL_W) {
-        const g = Math.floor(Math.random() * 35 + 8);
-        ctx.fillStyle = `rgba(${g},${g},${g},${p})`;
-        ctx.fillRect(x, sRect.y, COL_W, sRect.h);
-      }
-    }
-
-    function drawContent(p) {
-      // Dark backing
-      ctx.fillStyle = `rgba(10,10,10,${p * 0.9})`;
-      ctx.fillRect(cRect.x, cRect.y, cRect.w, cRect.h);
-      // Monospace character stream — live hex data
-      ctx.fillStyle = `rgba(65,65,65,${p * 0.8})`;
-      for (let y = cRect.y + CHAR_H; y < cRect.y + cRect.h; y += CHAR_H + 1) {
-        for (let x = cRect.x + 2; x < cRect.x + cRect.w - 2; x += CHAR_W) {
-          ctx.fillText(rchar(), x, y);
-        }
-      }
-    }
-
-    function drawAvatar(p) {
-      // Concentric pixel rings radiating from the avatar centre
-      const ax = aRect.x + aRect.w / 2;
-      const ay = aRect.y + aRect.h / 2;
-      const maxR = Math.max(aRect.w, aRect.h) / 2 + 2;
-      ctx.lineWidth = RING_W - 1;
-      for (let r = RING_W; r <= maxR; r += RING_W) {
-        const g = Math.floor(Math.random() * 55 + 15);
-        ctx.strokeStyle = `rgba(${g},${g},${g},${p})`;
-        ctx.beginPath();
-        ctx.arc(ax, ay, r, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    }
-
-    // ── gsap.ticker — redraws every frame while encrypting ───────────────────
-    const tickerFn = () => {
-      ctx.clearRect(0, 0, cw, ch);
-      if (ep.side > 0) drawSide(ep.side);
-      if (ep.avat > 0) drawAvatar(ep.avat);
-      if (ep.cont > 0) drawContent(ep.cont);
-    };
-    gsap.ticker.add(tickerFn);
-
-    // ── Cleanup ───────────────────────────────────────────────────────────────
-    function cleanup() {
-      gsap.ticker.remove(tickerFn);
-      stopBrandScramble(toMode.brand);
-      stopToggleGlitch();
-    }
-
-    // ── Timeline ──────────────────────────────────────────────────────────────
-    return gsap.timeline({ onComplete() { cleanup(); done(); } })
+    return gsap.timeline({ onComplete: done })
 
       // Message appears as the process begins
       .to(msgEl, { opacity: 1, duration: 0.3, ease: 'power1.out' })
 
-      // Elements encrypt in staggered sequence
-      .call(() => startBrandScramble())
-      .to(ep, { side: 1, duration: 0.55, ease: 'power1.in' }, '<+=0.05')
-      .call(() => startToggleGlitch(), null, '<+=0.12')
-      .to(ep, { avat: 1, duration: 0.4,  ease: 'power2.in' }, '<+=0.08')
-      .to(ep, { cont: 1, duration: 0.65, ease: 'power1.in' }, '<+=0.1')
+      // Sidebar seals — slides in from its left edge
+      .to(cvSide, { scaleX: 1, duration: 0.5, ease: 'power3.inOut' }, '<+=0.05')
 
-      // Hold at full encryption — everything locked
+      // Avatar locks — circle closes over it while content is still open
+      .to(cvAvat, { scale: 1, duration: 0.4, ease: 'power2.out' }, '<+=0.25')
+
+      // Content area seals last — the space itself closes
+      .to(cvCont, { scaleX: 1, duration: 0.6, ease: 'power3.inOut' }, '<+=0.12')
+
+      // Hold — everything sealed
       .to({}, { duration: 0.3 })
 
-      // Lock: snap mode, stop glitches, brand resolves to new name
-      .call(() => {
-        els.snap(to);
-        stopToggleGlitch();
-        stopBrandScramble(toMode.brand);
-      })
+      // Snap mode underneath — invisible behind the planes
+      .call(() => { els.snap(to); })
 
-      // Canvas fades — new mode reveals cleanly underneath
-      .to(canvas, { opacity: 0, duration: 0.55, ease: 'power2.out' })
+      // All planes release simultaneously — new space simply appears
+      .to([cvSide, cvCont, cvAvat], {
+        opacity: 0,
+        duration: 0.5,
+        ease: 'power2.out',
+      })
 
       // Hold, then message out
       .to({}, { duration: 0.85 })
